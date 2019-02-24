@@ -1,2 +1,2 @@
 all:
-	g++ -o pathfinder main.cpp -lGLEW -lglfw -lGL
+	g++ -g -o pathfinder main.cpp

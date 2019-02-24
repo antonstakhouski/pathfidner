@@ -11,27 +11,19 @@
 
 #include <boost/tokenizer.hpp>
 
-// Include GLEW
-#include <GL/glew.h>
-
-// Include GLFW
-#include <GLFW/glfw3.h>
-GLFWwindow* window;
-
-// Include GLM
-#include <glm/glm.hpp>
-
-using namespace glm;
 using namespace boost;
 using namespace std;
 
 enum CELL_TYPE {
   START = -2,
-  BLOCKED = -1,
+  BLOCKED = -3,
   EMPTY = 0
 };
 
-int load_data(char* filename, vector<vector<CELL_TYPE>>& out_vec)
+vector<vector<int>> vec;
+static int num_steps = 0;
+
+int load_data(char* filename)
 {
   string data(filename);
   ifstream in(data.c_str());
@@ -39,22 +31,92 @@ int load_data(char* filename, vector<vector<CELL_TYPE>>& out_vec)
 
   typedef tokenizer<escaped_list_separator<char>> Tokenizer;
 
-  vector<string> vec;
+  vector<string> vec_tmp;
   string line;
 
   while (getline(in, line))
   {
     Tokenizer tok(line);
-    vec.assign(tok.begin(),tok.end());
+    vec_tmp.assign(tok.begin(),tok.end());
 
-    vector<CELL_TYPE> line_vec;
-    for (auto element: vec) {
-      line_vec.push_back(static_cast<CELL_TYPE>(stoi(element)));
+    vector<int> line_vec;
+    for (auto element: vec_tmp) {
+      line_vec.push_back(stoi(element));
     }
-    out_vec.push_back(line_vec);
+    vec.push_back(line_vec);
   }
 
   return 0;
+}
+
+void find_start_point(int& startX, int& startY)
+{
+  for(int i = 0; i < vec.size(); i++) {
+    for(int j = 0; j < vec[i].size(); j++) {
+      if (vec[i][j] == START) {
+        startX = j;
+        startY = i;
+        return;
+      }
+    }
+  }
+}
+
+void draw_array()
+{
+  for(int i = 0; i < vec.size(); i++) {
+    for(int j = 0; j < vec[i].size(); j++)
+      printf("%3d", vec[i][j]);
+    printf("\n");
+  }
+  printf("\n");
+}
+
+void mark_point(int x, int y, int counter)
+{
+  if ((y >= 0) && (y < vec.size()) && (x >= 0) && (x < vec[y].size()) && (vec[y][x] == EMPTY))
+    vec[y][x] = counter;
+}
+
+void mark_nearest(int startX, int startY, int counter)
+{
+  num_steps++;
+  printf("Step: %d\n", num_steps);
+
+  mark_point(startX, startY + 1, counter);
+  mark_point(startX, startY - 1, counter);
+  mark_point(startX - 1, startY, counter);
+  mark_point(startX + 1, startY, counter);
+
+  draw_array();
+
+  int newX, newY;
+  //return;
+
+  newY = startY + 1;
+  newX = startX;
+  if ((newY >= 0) && (newY < vec.size()) &&
+      (newX >= 0) && (newX < vec[newY].size()) && (vec[newY][newX] == counter))
+    mark_nearest(newX, newY, counter + 1);
+
+  newY = startY - 1;
+  newX = startX;
+  if ((newY >= 0) && (newY < vec.size()) &&
+      (newX >= 0) && (newX < vec[newY].size()) && (vec[newY][newX] == counter))
+    mark_nearest(newX, newY, counter + 1);
+
+  newY = startY;
+  newX = startX - 1;
+  if ((newY >= 0) && (newY < vec.size()) &&
+      (newX >= 0) && (newX < vec[newY].size()) && (vec[newY][newX] == counter))
+    mark_nearest(newX, newY, counter + 1);
+
+  newY = startY;
+  newX = startX + 1;
+  if ((newY >= 0) && (newY < vec.size()) &&
+      (newX >= 0) && (newX < vec[newY].size()) && (vec[newY][newX] == counter))
+    mark_nearest(newX, newY, counter + 1);
+  return;
 }
 
 int main(int argc, char** argv)
@@ -64,67 +126,19 @@ int main(int argc, char** argv)
     return -1;
   }
 
-  vector<vector<CELL_TYPE>> data_vec;
-
-  if (load_data(argv[1], data_vec))
+  if (load_data(argv[1]))
     return -1;
 
-  return 0;
+  printf("Step: %d\n", num_steps);
+  draw_array();
 
-  // Initialise GLFW
-  if( !glfwInit() )
-  {
-    fprintf( stderr, "Failed to initialize GLFW\n" );
-    getchar();
-    return -1;
-  }
+  int startX, startY;
+  find_start_point(startX, startY);
+  //printf("X: %d. Y: %d\n", startX, startY);
 
-  glfwWindowHint(GLFW_SAMPLES, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-  // Open a window and create its OpenGL context
-  window = glfwCreateWindow( 1024, 768, "Tutorial 01", NULL, NULL);
-  if( window == NULL ){
-    fprintf( stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.\n" );
-    getchar();
-    glfwTerminate();
-    return -1;
-  }
-  glfwMakeContextCurrent(window);
-
-  // Initialize GLEW
-  if (glewInit() != GLEW_OK) {
-    perror("Failed to initialize GLEW");
-    getchar();
-    glfwTerminate();
-    return -1;
-  }
-
-  // Ensure we can capture the escape key being pressed below
-  glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
-
-  // Dark blue background
-  glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
-
-  do{
-    // Clear the screen. It's not mentioned before Tutorial 02, but it can cause flickering, so it's there nonetheless.
-    glClear( GL_COLOR_BUFFER_BIT );
-
-    // Draw nothing, see you in tutorial 2 !
-
-
-    // Swap buffers
-    glfwSwapBuffers(window);
-    glfwPollEvents();
-
-  } // Check if the ESC key was pressed or the window was closed
-  while( glfwGetKey(window, GLFW_KEY_ESCAPE ) != GLFW_PRESS &&
-      glfwWindowShouldClose(window) == 0 );
-
-  // Close OpenGL window and terminate GLFW
-  glfwTerminate();
+  //vec[startY][startX] = 0;
+  int counter = 0;
+  mark_nearest(startX, startY, counter + 1);
 
   return 0;
 }
