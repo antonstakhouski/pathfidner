@@ -1,2 +1,2 @@
 all:
-	g++ -g -o pathfinder main.cpp
+	g++ -g -o pathfinder lab12.cpp
